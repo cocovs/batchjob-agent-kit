@@ -45,6 +45,21 @@ curl -fsSL https://raw.githubusercontent.com/cocovs/batchjob-agent-kit/main/inst
 curl -fsSL https://raw.githubusercontent.com/cocovs/batchjob-agent-kit/main/install.sh | bash -s -- --version v0.1.0
 ```
 
+## Install With Homebrew
+
+```bash
+brew install cocovs/tap/batchjob-cli
+```
+
+Or:
+
+```bash
+brew tap cocovs/tap
+brew install batchjob-cli
+```
+
+Homebrew installs the CLI only. If you also want the Codex or Claude skill pack, use the GitHub Release installer above.
+
 ## Local Build
 
 ```bash
