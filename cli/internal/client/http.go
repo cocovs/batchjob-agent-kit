@@ -78,9 +78,45 @@ func (c *Client) endpoint(path string) string {
 }
 
 func (c *Client) GetJSON(ctx context.Context, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint(path), nil)
+	return c.GetJSONWithQuery(ctx, path, nil, out)
+}
+
+func (c *Client) GetJSONWithQuery(ctx context.Context, path string, query url.Values, out any) error {
+	endpoint := c.endpoint(path)
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return decodeResponse(resp, out)
+}
+
+func (c *Client) PostJSON(ctx context.Context, path string, in any, out any) error {
+	var body io.Reader
+	if in != nil {
+		payload, err := json.Marshal(in)
+		if err != nil {
+			return fmt.Errorf("encode request JSON: %w", err)
+		}
+		body = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint(path), body)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
 	if c.token != "" {
@@ -106,7 +142,6 @@ func decodeResponse(resp *http.Response, out any) error {
 		return nil
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
-	dec.DisallowUnknownFields()
 	if err := dec.Decode(out); err != nil {
 		return fmt.Errorf("decode response JSON: %w", err)
 	}

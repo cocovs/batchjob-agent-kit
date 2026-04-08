@@ -23,12 +23,36 @@ type templateSummary struct {
 }
 
 type templateSchemaResponse struct {
-	TemplateID   string `json:"templateId"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	Scenario     string `json:"scenario"`
-	InputSummary string `json:"inputSummary"`
-	OutputType   string `json:"outputType"`
+	TemplateID   string                 `json:"templateId"`
+	Version      string                 `json:"version"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	Scenario     string                 `json:"scenario"`
+	InputSummary string                 `json:"inputSummary"`
+	OutputType   string                 `json:"outputType"`
+	Fields       []templateFieldSchema  `json:"fields"`
+	Columns      []templateColumnSchema `json:"columns"`
+	SampleRows   []templateSampleRow    `json:"sampleRows"`
+}
+
+type templateFieldSchema struct {
+	Key        string   `json:"key"`
+	Label      string   `json:"label"`
+	Required   bool     `json:"required"`
+	Type       string   `json:"type"`
+	EnumValues []string `json:"enumValues"`
+	MultiValue bool     `json:"multiValue"`
+	Scope      string   `json:"scope"`
+}
+
+type templateColumnSchema struct {
+	FieldKey    string `json:"fieldKey"`
+	HeaderLabel string `json:"headerLabel"`
+	Order       int    `json:"order"`
+}
+
+type templateSampleRow struct {
+	Values map[string]string `json:"values"`
 }
 
 func newTemplateCmd(opts *rootOptions) *cobra.Command {
@@ -110,6 +134,12 @@ func newTemplateSchemaCmd(opts *rootOptions) *cobra.Command {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "scenario: %s\n", resp.Scenario)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "input: %s\n", resp.InputSummary)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "description: %s\n", resp.Description)
+			if len(resp.Columns) > 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "columns:")
+				for _, column := range resp.Columns {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "- %s (%s)\n", column.HeaderLabel, column.FieldKey)
+				}
+			}
 			return nil
 		},
 	}

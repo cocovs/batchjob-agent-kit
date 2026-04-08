@@ -27,7 +27,14 @@ Use this skill when the user wants to run hosted batch generation tasks through 
    `batchjob-cli template list`
 3. Inspect one template:
    `batchjob-cli template schema <template-id>`
-4. After confirming the right template and preparing input rows, use the higher-level run flow when the CLI adds it.
+4. Prepare a JSONL or JSON array file that matches the schema.
+5. Submit a run:
+   `batchjob-cli run submit <template-id> -f rows.jsonl`
+6. Watch the run:
+   `batchjob-cli run watch <run-id>`
+7. List or download artifacts:
+   `batchjob-cli artifact list <run-id>`
+   `batchjob-cli artifact download <run-id>`
 
 ## Current MVP Scope
 
@@ -36,5 +43,7 @@ The public CLI MVP currently supports:
 - `batchjob-cli doctor`
 - `batchjob-cli template list`
 - `batchjob-cli template schema <template-id>`
-
-If the user asks to execute a full run and the public CLI has not yet shipped that command, explain that the current public MVP supports discovery first and that run submission is the next planned step.
+- `batchjob-cli run submit <template-id> -f rows.jsonl`
+- `batchjob-cli run watch <run-id>`
+- `batchjob-cli artifact list <run-id>`
+- `batchjob-cli artifact download <run-id>`

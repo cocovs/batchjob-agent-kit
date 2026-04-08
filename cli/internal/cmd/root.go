@@ -37,7 +37,9 @@ func NewRootCmd() *cobra.Command {
 
 	cmd.AddCommand(
 		newDoctorCmd(opts),
+		newRunCmd(opts),
 		newTemplateCmd(opts),
+		newArtifactCmd(opts),
 	)
 	return cmd
 }

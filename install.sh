@@ -5,6 +5,22 @@ REPO="cocovs/batchjob-agent-kit"
 VERSION="${VERSION:-latest}"
 AGENT="codex"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+SKILL_DIR="${SKILL_DIR:-}"
+INSTALL_SKILL=1
+
+usage() {
+  cat <<'EOF'
+Usage: install.sh [options]
+
+Options:
+  --agent <codex|claude>   Install the matching skill pack (default: codex)
+  --install-dir <path>     Directory for batchjob-cli (default: ~/.local/bin)
+  --skill-dir <path>       Override the destination directory for SKILL.md
+  --version <tag|latest>   GitHub release tag to install (default: latest)
+  --no-skill               Install only the CLI
+  --help                   Show this help text
+EOF
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -15,6 +31,22 @@ while [[ $# -gt 0 ]]; do
     --install-dir)
       INSTALL_DIR="${2:-$HOME/.local/bin}"
       shift 2
+      ;;
+    --skill-dir)
+      SKILL_DIR="${2:-}"
+      shift 2
+      ;;
+    --version)
+      VERSION="${2:-latest}"
+      shift 2
+      ;;
+    --no-skill)
+      INSTALL_SKILL=0
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
       ;;
     *)
       echo "unknown argument: $1" >&2
@@ -36,18 +68,131 @@ esac
 
 mkdir -p "$INSTALL_DIR"
 
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+resolve_skill_dir() {
+  if [[ -n "$SKILL_DIR" ]]; then
+    printf '%s\n' "$SKILL_DIR"
+    return
+  fi
+  case "$AGENT" in
+    codex)
+      printf '%s\n' "$HOME/.codex/skills/batchjob"
+      ;;
+    claude)
+      printf '%s\n' "$HOME/.claude/skills/batchjob"
+      ;;
+    *)
+      echo "unsupported agent for automatic skill install: $AGENT" >&2
+      exit 1
+      ;;
+  esac
+}
+
+resolve_tag() {
+  if [[ "$VERSION" != "latest" ]]; then
+    printf '%s\n' "$VERSION"
+    return
+  fi
+  local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+  local tag
+  tag="$(
+    curl -fsSL "$api_url" \
+      | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+      | head -n1
+  )"
+  if [[ -z "$tag" ]]; then
+    echo "failed to resolve latest release tag from $api_url" >&2
+    exit 1
+  fi
+  printf '%s\n' "$tag"
+}
+
+checksum_tool() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s\n' "sha256sum"
+    return
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    printf '%s\n' "shasum -a 256"
+    return
+  fi
+  printf '%s\n' ""
+}
+
+verify_checksum() {
+  local tool="$1"
+  local checksums_file="$2"
+  local asset_name="$3"
+  local asset_path="$4"
+  local expected
+  expected="$(awk -v name="$asset_name" '$2 == name { print $1 }' "$checksums_file")"
+  if [[ -z "$expected" || -z "$tool" ]]; then
+    return
+  fi
+  local actual
+  actual="$($tool "$asset_path" | awk '{print $1}')"
+  if [[ "$expected" != "$actual" ]]; then
+    echo "checksum mismatch for $asset_name" >&2
+    exit 1
+  fi
+}
+
+require_cmd curl
+require_cmd tar
+
+TAG="$(resolve_tag)"
+CLI_ASSET="batchjob-cli-${OS}-${ARCH}.tar.gz"
+SKILL_ASSET="batchjob-skills.tar.gz"
+CHECKSUM_ASSET="checksums.txt"
+BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
 echo "batchjob-agent-kit installer"
 echo "repo: $REPO"
-echo "version: $VERSION"
+echo "version: $TAG"
 echo "agent: $AGENT"
 echo "install dir: $INSTALL_DIR"
+if [[ "$INSTALL_SKILL" -eq 1 ]]; then
+  echo "skill dir: $(resolve_skill_dir)"
+else
+  echo "skill install: disabled"
+fi
 echo
-echo "MVP note:"
-echo "- CLI release packaging is not wired yet."
-echo "- For now, build from source inside the public repo:"
-echo "    cd cli && go build -o \"$INSTALL_DIR/batchjob-cli\" ./cmd/batchjob-cli"
-echo "- Then install the skill file for your agent from ./skills/$AGENT/batchjob/SKILL.md"
+
+curl -fsSL -o "$TMP_DIR/$CLI_ASSET" "$BASE_URL/$CLI_ASSET"
+curl -fsSL -o "$TMP_DIR/$CHECKSUM_ASSET" "$BASE_URL/$CHECKSUM_ASSET"
+VERIFY_TOOL="$(checksum_tool)"
+verify_checksum "$VERIFY_TOOL" "$TMP_DIR/$CHECKSUM_ASSET" "$CLI_ASSET" "$TMP_DIR/$CLI_ASSET"
+
+mkdir -p "$TMP_DIR/cli"
+tar -xzf "$TMP_DIR/$CLI_ASSET" -C "$TMP_DIR/cli"
+install -m 0755 "$TMP_DIR/cli/batchjob-cli" "$INSTALL_DIR/batchjob-cli"
+
+if [[ "$INSTALL_SKILL" -eq 1 ]]; then
+  curl -fsSL -o "$TMP_DIR/$SKILL_ASSET" "$BASE_URL/$SKILL_ASSET"
+  verify_checksum "$VERIFY_TOOL" "$TMP_DIR/$CHECKSUM_ASSET" "$SKILL_ASSET" "$TMP_DIR/$SKILL_ASSET"
+
+  mkdir -p "$TMP_DIR/skills"
+  tar -xzf "$TMP_DIR/$SKILL_ASSET" -C "$TMP_DIR/skills"
+  FINAL_SKILL_DIR="$(resolve_skill_dir)"
+  mkdir -p "$FINAL_SKILL_DIR"
+  install -m 0644 "$TMP_DIR/skills/skills/$AGENT/batchjob/SKILL.md" "$FINAL_SKILL_DIR/SKILL.md"
+fi
+
+echo "installed:"
+echo "  $INSTALL_DIR/batchjob-cli"
+if [[ "$INSTALL_SKILL" -eq 1 ]]; then
+  echo "  $(resolve_skill_dir)/SKILL.md"
+fi
 echo
-echo "Expected environment:"
+echo "next:"
 echo "  export BATCHJOB_SERVER=https://batchjob-test.shengsuanyun.com/batch"
 echo "  export BATCHJOB_TOKEN=your-token"
+echo "  batchjob-cli doctor"

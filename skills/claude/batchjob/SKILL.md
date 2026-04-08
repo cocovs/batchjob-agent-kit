@@ -24,7 +24,19 @@ Use this skill when the user wants to use hosted BatchJob capabilities through `
    `batchjob-cli template list`
 4. Inspect schema:
    `batchjob-cli template schema <template-id>`
+5. Submit a run:
+   `batchjob-cli run submit <template-id> -f rows.jsonl`
+6. Watch the run:
+   `batchjob-cli run watch <run-id>`
+7. Download outputs when ready:
+   `batchjob-cli artifact download <run-id>`
 
 ## Current MVP Scope
 
-The first public CLI release only covers environment verification and template discovery.
+The first public CLI release covers:
+
+- environment verification
+- template discovery
+- official template row submission
+- run watching
+- artifact listing and download

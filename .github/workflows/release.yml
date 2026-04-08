@@ -46,8 +46,14 @@ jobs:
       - name: Normalize dist layout
         run: |
           mkdir -p release
-          find dist -type f -name 'batchjob-cli-*' -exec cp {} release/ \;
-          tar -czf release/batchjob-skill-pack.tar.gz skills
+          while IFS= read -r binary; do
+            name="$(basename "$binary")"
+            staging="$(mktemp -d)"
+            cp "$binary" "$staging/batchjob-cli"
+            tar -C "$staging" -czf "release/${name}.tar.gz" batchjob-cli
+            rm -rf "$staging"
+          done < <(find dist -type f -name 'batchjob-cli-*' | sort)
+          tar -czf release/batchjob-skills.tar.gz skills
           cp install.sh manifest.json README.md release/
           (cd release && sha256sum * > checksums.txt)
       - name: Upload packaged assets
@@ -55,3 +61,8 @@ jobs:
         with:
           name: release-assets
           path: release/*
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*

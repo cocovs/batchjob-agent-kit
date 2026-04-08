@@ -7,7 +7,11 @@
     "scope": [
       "doctor",
       "template.list",
-      "template.schema"
+      "template.schema",
+      "run.submit",
+      "run.watch",
+      "artifact.list",
+      "artifact.download"
     ]
   },
   "skills": [

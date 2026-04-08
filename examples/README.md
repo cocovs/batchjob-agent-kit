@@ -5,5 +5,9 @@ These are starter inputs for hosted BatchJob templates.
 - `text-image-v1.input.jsonl`
 - `text-image-video-v1.input.jsonl`
 
-Current public CLI MVP focuses on environment verification and template discovery.
-Submission commands will be added in the next iteration.
+Use them with:
+
+```bash
+./cli/batchjob-cli run submit text-image-v1 -f examples/text-image-v1.input.jsonl
+./cli/batchjob-cli run submit text-image-video-v1 -f examples/text-image-video-v1.input.jsonl
+```
