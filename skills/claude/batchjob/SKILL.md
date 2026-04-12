@@ -1,6 +1,6 @@
 ---
 name: batchjob
-description: Use batchjob-cli to discover templates, submit batch runs, watch execution, and download artifacts.
+description: Use batchjob-cli to discover executable models and templates, submit batch runs, watch execution, and download artifacts.
 ---
 
 # batchjob
@@ -20,15 +20,18 @@ Use this skill when the user wants to use hosted BatchJob capabilities through `
    `BATCHJOB_TOKEN`
 2. Run:
    `batchjob-cli doctor`
-3. Discover templates:
+3. Discover executable models when needed:
+   `batchjob-cli model list --step-type image-generate`
+   `batchjob-cli model get <model-id>`
+4. Discover templates:
    `batchjob-cli template list`
-4. Inspect schema:
+5. Inspect schema:
    `batchjob-cli template schema <template-id>`
-5. Submit a run:
+6. Submit a run:
    `batchjob-cli run submit <template-id> -f rows.jsonl`
-6. Watch the run:
+7. Watch the run:
    `batchjob-cli run watch <run-id>`
-7. Download outputs when ready:
+8. Download outputs when ready:
    `batchjob-cli artifact download <run-id>`
 
 ## Current MVP Scope
@@ -36,6 +39,7 @@ Use this skill when the user wants to use hosted BatchJob capabilities through `
 The first public CLI release covers:
 
 - environment verification
+- executable model discovery
 - template discovery
 - official template row submission
 - run watching

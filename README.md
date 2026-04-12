@@ -15,6 +15,8 @@ This repository is the public delivery surface for developers and agents to use 
 The first public CLI is HTTP-based and focuses on:
 
 - `batchjob-cli doctor`
+- `batchjob-cli model list --step-type image-generate`
+- `batchjob-cli model get <model-id>`
 - `batchjob-cli template list`
 - `batchjob-cli template schema <template-id>`
 - `batchjob-cli run submit <template-id> -f rows.jsonl`
@@ -74,6 +76,8 @@ export BATCHJOB_SERVER="https://batchjob-test.shengsuanyun.com/batch"
 export BATCHJOB_TOKEN="your-token"
 
 ./cli/batchjob-cli doctor
+./cli/batchjob-cli model list --step-type image-generate
+./cli/batchjob-cli model get google/gemini-2.5-flash-image
 ./cli/batchjob-cli template list
 ./cli/batchjob-cli template schema text-image-v1
 ./cli/batchjob-cli run submit text-image-v1 -f examples/text-image-v1.input.jsonl
@@ -83,6 +87,23 @@ export BATCHJOB_TOKEN="your-token"
 ```
 
 If `template list` returns `no templates`, the target environment likely has not imported official template seed data yet.
+
+## Model Discovery
+
+Use model discovery when you need to understand which executable models are currently
+available for one step type:
+
+```bash
+./cli/batchjob-cli model list --step-type text-generate
+./cli/batchjob-cli model list --step-type image-generate --provider vertex
+./cli/batchjob-cli model get google/gemini-2.5-flash-image
+```
+
+`model list` is step-type scoped on purpose. Common values are:
+
+- `text-generate`
+- `image-generate`
+- `video-generate`
 
 ## Input File Format
 

@@ -6,6 +6,8 @@
     "name": "batchjob-cli",
     "scope": [
       "doctor",
+      "model.list",
+      "model.get",
       "template.list",
       "template.schema",
       "run.submit",

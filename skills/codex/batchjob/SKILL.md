@@ -1,6 +1,6 @@
 ---
 name: batchjob
-description: Use batchjob-cli to discover templates, submit batch runs, watch execution, and download artifacts.
+description: Use batchjob-cli to discover executable models and templates, submit batch runs, watch execution, and download artifacts.
 ---
 
 # batchjob
@@ -23,16 +23,19 @@ Use this skill when the user wants to run hosted batch generation tasks through 
 
 1. Check environment:
    `batchjob-cli doctor`
-2. Discover available templates:
+2. Discover executable models when step-level model choice matters:
+   `batchjob-cli model list --step-type image-generate`
+   `batchjob-cli model get <model-id>`
+3. Discover available templates:
    `batchjob-cli template list`
-3. Inspect one template:
+4. Inspect one template:
    `batchjob-cli template schema <template-id>`
-4. Prepare a JSONL or JSON array file that matches the schema.
-5. Submit a run:
+5. Prepare a JSONL or JSON array file that matches the schema.
+6. Submit a run:
    `batchjob-cli run submit <template-id> -f rows.jsonl`
-6. Watch the run:
+7. Watch the run:
    `batchjob-cli run watch <run-id>`
-7. List or download artifacts:
+8. List or download artifacts:
    `batchjob-cli artifact list <run-id>`
    `batchjob-cli artifact download <run-id>`
 
@@ -41,6 +44,8 @@ Use this skill when the user wants to run hosted batch generation tasks through 
 The public CLI MVP currently supports:
 
 - `batchjob-cli doctor`
+- `batchjob-cli model list --step-type <step-type>`
+- `batchjob-cli model get <model-id>`
 - `batchjob-cli template list`
 - `batchjob-cli template schema <template-id>`
 - `batchjob-cli run submit <template-id> -f rows.jsonl`

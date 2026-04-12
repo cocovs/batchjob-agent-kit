@@ -253,6 +253,46 @@ func printArtifacts(w io.Writer, artifacts []artifactEntry) error {
 	return tw.Flush()
 }
 
+func printModelSummaries(w io.Writer, models []modelSummary) error {
+	tw := newTabWriter(w)
+	if _, err := fmt.Fprintln(tw, "model_id\tprovider\tstep_types\tavailable\tinput\toutput\treason"); err != nil {
+		return err
+	}
+	for _, model := range models {
+		if _, err := fmt.Fprintf(
+			tw,
+			"%s\t%s\t%s\t%t\t%s\t%s\t%s\n",
+			model.ModelID,
+			model.Provider,
+			strings.Join(model.SupportedStepTypes, ","),
+			model.Available,
+			strings.Join(model.InputModalities, ","),
+			strings.Join(model.OutputModalities, ","),
+			model.AvailabilityReason,
+		); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
+
+func printModelDetail(w io.Writer, model modelDetail) error {
+	_, _ = fmt.Fprintf(w, "model: %s\n", model.ModelID)
+	_, _ = fmt.Fprintf(w, "name: %s\n", model.DisplayName)
+	_, _ = fmt.Fprintf(w, "provider: %s\n", model.Provider)
+	_, _ = fmt.Fprintf(w, "available: %t\n", model.Available)
+	if model.AvailabilityReason != "" {
+		_, _ = fmt.Fprintf(w, "reason: %s\n", model.AvailabilityReason)
+	}
+	_, _ = fmt.Fprintf(w, "step_types: %s\n", strings.Join(model.SupportedStepTypes, ", "))
+	_, _ = fmt.Fprintf(w, "input_modalities: %s\n", strings.Join(model.InputModalities, ", "))
+	_, _ = fmt.Fprintf(w, "output_modalities: %s\n", strings.Join(model.OutputModalities, ", "))
+	if len(model.SupportedAPIs) > 0 {
+		_, _ = fmt.Fprintf(w, "supported_apis: %s\n", strings.Join(model.SupportedAPIs, ", "))
+	}
+	return nil
+}
+
 func loadTemplateRows(path string) ([]templateDisplayRow, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
