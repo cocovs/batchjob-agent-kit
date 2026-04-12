@@ -168,6 +168,27 @@ func printValidation(w io.Writer, resp validateTemplateRowsResponse) error {
 	return nil
 }
 
+func printTemplateFileValidation(w io.Writer, resp validateTemplateFileResponse) error {
+	if resp.Valid {
+		_, err := fmt.Fprintln(w, "valid")
+		return err
+	}
+	if _, err := fmt.Fprintln(w, "invalid"); err != nil {
+		return err
+	}
+	for _, fileErr := range resp.FileErrors {
+		if _, err := fmt.Fprintf(w, "file: %s\n", fileErr); err != nil {
+			return err
+		}
+	}
+	for _, rowErr := range resp.RowErrors {
+		if _, err := fmt.Fprintf(w, "row %d field %s: %s\n", rowErr.RowIndex, rowErr.FieldKey, rowErr.Error); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func printPrecheck(w io.Writer, resp precheckTemplateRowsResponse) error {
 	if _, err := fmt.Fprintf(w, "estimated_cost\t%s\n", formatCost(int64(resp.EstimatedTotalCost))); err != nil {
 		return err
@@ -401,6 +422,20 @@ func validationError(resp validateTemplateRowsResponse) error {
 	}
 	first := resp.RowErrors[0]
 	return fmt.Errorf("template rows validation failed: row %d field %s: %s", first.RowIndex, first.FieldKey, first.Error)
+}
+
+func templateFileValidationError(resp validateTemplateFileResponse) error {
+	if resp.Valid {
+		return nil
+	}
+	if len(resp.FileErrors) > 0 {
+		return fmt.Errorf("template file validation failed: %s", resp.FileErrors[0])
+	}
+	if len(resp.RowErrors) > 0 {
+		first := resp.RowErrors[0]
+		return fmt.Errorf("template file validation failed: row %d field %s: %s", first.RowIndex, first.FieldKey, first.Error)
+	}
+	return errors.New("template file validation failed")
 }
 
 func resolveFilePath(target string, defaultName string) (string, error) {

@@ -1,6 +1,6 @@
 ---
 name: batchjob
-description: Use batchjob-cli to discover executable models and templates, submit batch runs, watch execution, and download artifacts.
+description: Use batchjob-cli to discover executable models and templates, download or submit official template Excel files, watch execution, and download artifacts.
 ---
 
 # batchjob
@@ -30,12 +30,16 @@ Use this skill when the user wants to run hosted batch generation tasks through 
    `batchjob-cli template list`
 4. Inspect one template:
    `batchjob-cli template schema <template-id>`
-5. Prepare a JSONL or JSON array file that matches the schema.
-6. Submit a run:
+5. If you want the official Excel workflow:
+   `batchjob-cli template download <template-id>`
+   `batchjob-cli template validate-file <template-id> <xlsx-path>`
+   `batchjob-cli template submit-file <template-id> <xlsx-path>`
+6. Or prepare a JSONL or JSON array file that matches the schema.
+7. Submit a run:
    `batchjob-cli run submit <template-id> -f rows.jsonl`
-7. Watch the run:
+8. Watch the run:
    `batchjob-cli run watch <run-id>`
-8. List or download artifacts:
+9. List or download artifacts:
    `batchjob-cli artifact list <run-id>`
    `batchjob-cli artifact download <run-id>`
 
@@ -48,6 +52,9 @@ The public CLI MVP currently supports:
 - `batchjob-cli model get <model-id>`
 - `batchjob-cli template list`
 - `batchjob-cli template schema <template-id>`
+- `batchjob-cli template download <template-id>`
+- `batchjob-cli template validate-file <template-id> <xlsx-path>`
+- `batchjob-cli template submit-file <template-id> <xlsx-path>`
 - `batchjob-cli run submit <template-id> -f rows.jsonl`
 - `batchjob-cli run watch <run-id>`
 - `batchjob-cli artifact list <run-id>`

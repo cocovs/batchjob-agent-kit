@@ -19,6 +19,9 @@ The first public CLI is HTTP-based and focuses on:
 - `batchjob-cli model get <model-id>`
 - `batchjob-cli template list`
 - `batchjob-cli template schema <template-id>`
+- `batchjob-cli template download <template-id>`
+- `batchjob-cli template validate-file <template-id> <xlsx-path>`
+- `batchjob-cli template submit-file <template-id> <xlsx-path>`
 - `batchjob-cli run submit <template-id> -f rows.jsonl`
 - `batchjob-cli run watch <run-id>`
 - `batchjob-cli artifact list <run-id>`
@@ -80,6 +83,9 @@ export BATCHJOB_TOKEN="your-token"
 ./cli/batchjob-cli model get google/gemini-2.5-flash-image
 ./cli/batchjob-cli template list
 ./cli/batchjob-cli template schema text-image-v1
+./cli/batchjob-cli template download text-image-v1 --output-file ./text-image-v1.xlsx
+./cli/batchjob-cli template validate-file text-image-v1 ./filled-text-image-v1.xlsx
+./cli/batchjob-cli template submit-file text-image-v1 ./filled-text-image-v1.xlsx
 ./cli/batchjob-cli run submit text-image-v1 -f examples/text-image-v1.input.jsonl
 ./cli/batchjob-cli run watch <run-id>
 ./cli/batchjob-cli artifact list <run-id>
@@ -113,3 +119,16 @@ available for one step type:
 - JSON array of flat objects
 
 The field names must match the template schema. Starter files live under `examples/`.
+
+## Excel Template Workflow
+
+For official templates, users can also work through Excel instead of JSON/JSONL:
+
+```bash
+./cli/batchjob-cli template download text-image-v1 --output-file ./text-image-v1.xlsx
+./cli/batchjob-cli template validate-file text-image-v1 ./filled-text-image-v1.xlsx
+./cli/batchjob-cli template submit-file text-image-v1 ./filled-text-image-v1.xlsx
+./cli/batchjob-cli run watch <run-id>
+```
+
+`template submit-file` uploads the filled workbook and directly creates a run.

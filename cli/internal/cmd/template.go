@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -55,6 +58,66 @@ type templateSampleRow struct {
 	Values map[string]string `json:"values"`
 }
 
+type validateTemplateFileResponse struct {
+	Valid      bool                 `json:"valid"`
+	FileErrors []string             `json:"fileErrors"`
+	RowErrors  []rowValidationError `json:"rowErrors"`
+}
+
+func (r *validateTemplateFileResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		Valid         bool                 `json:"valid"`
+		FileErrors    []string             `json:"fileErrors"`
+		FileErrorsAlt []string             `json:"file_errors"`
+		RowErrors     []rowValidationError `json:"rowErrors"`
+		RowErrorsAlt  []rowValidationError `json:"row_errors"`
+	}
+	var parsed alias
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return err
+	}
+	r.Valid = parsed.Valid
+	r.FileErrors = parsed.FileErrors
+	if len(r.FileErrors) == 0 {
+		r.FileErrors = parsed.FileErrorsAlt
+	}
+	r.RowErrors = parsed.RowErrors
+	if len(r.RowErrors) == 0 {
+		r.RowErrors = parsed.RowErrorsAlt
+	}
+	return nil
+}
+
+type submitTemplateFileResponse struct {
+	RunID      string    `json:"runId"`
+	Status     string    `json:"status"`
+	AcceptedAt flexInt64 `json:"acceptedAt"`
+}
+
+func (r *submitTemplateFileResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		RunID         string    `json:"runId"`
+		RunIDAlt      string    `json:"run_id"`
+		Status        string    `json:"status"`
+		AcceptedAt    flexInt64 `json:"acceptedAt"`
+		AcceptedAtAlt flexInt64 `json:"accepted_at"`
+	}
+	var parsed alias
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return err
+	}
+	r.RunID = parsed.RunID
+	if r.RunID == "" {
+		r.RunID = parsed.RunIDAlt
+	}
+	r.Status = parsed.Status
+	r.AcceptedAt = parsed.AcceptedAt
+	if r.AcceptedAt == 0 {
+		r.AcceptedAt = parsed.AcceptedAtAlt
+	}
+	return nil
+}
+
 func newTemplateCmd(opts *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template",
@@ -64,6 +127,9 @@ func newTemplateCmd(opts *rootOptions) *cobra.Command {
 	cmd.AddCommand(
 		newTemplateListCmd(opts),
 		newTemplateSchemaCmd(opts),
+		newTemplateDownloadCmd(opts),
+		newTemplateValidateFileCmd(opts),
+		newTemplateSubmitFileCmd(opts),
 	)
 	return cmd
 }
@@ -143,4 +209,187 @@ func newTemplateSchemaCmd(opts *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newTemplateDownloadCmd(opts *rootOptions) *cobra.Command {
+	var outputPath string
+
+	cmd := &cobra.Command{
+		Use:   "download <template-id>",
+		Short: "Download the official template Excel workbook",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			httpClient, err := newHTTPClient(opts)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), opts.timeout)
+			defer cancel()
+
+			resp, err := httpClient.GetBinary(ctx, "/v1/templates/"+strings.TrimSpace(args[0])+"/download")
+			if err != nil {
+				return err
+			}
+
+			filename := suggestedDownloadFilename(resp.ContentDisposition)
+			if filename == "" {
+				filename = strings.TrimSpace(args[0]) + ".xlsx"
+			}
+			targetPath, err := resolveFilePath(outputPath, filename)
+			if err != nil {
+				return fmt.Errorf("resolve output file path: %w", err)
+			}
+			if err := os.WriteFile(targetPath, resp.Body, 0o644); err != nil {
+				return fmt.Errorf("write downloaded file: %w", err)
+			}
+
+			result := map[string]any{
+				"templateId": args[0],
+				"path":       targetPath,
+				"filename":   filename,
+				"size":       len(resp.Body),
+			}
+			if opts.output == "json" {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(result)
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "template_id\t%s\npath\t%s\nsize\t%d\n", args[0], targetPath, len(resp.Body))
+			return err
+		},
+	}
+	cmd.Flags().StringVarP(&outputPath, "output-file", "f", "", "Output .xlsx path or target directory")
+	return cmd
+}
+
+func newTemplateValidateFileCmd(opts *rootOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:   "validate-file <template-id> <xlsx-path>",
+		Short: "Validate one filled official template Excel workbook",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			httpClient, err := newHTTPClient(opts)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), opts.timeout)
+			defer cancel()
+
+			var resp validateTemplateFileResponse
+			if err := httpClient.PostMultipartFile(ctx, "/v1/templates/validate", map[string]string{
+				"template_id": strings.TrimSpace(args[0]),
+			}, "file", args[1], &resp); err != nil {
+				return err
+			}
+
+			result := map[string]any{
+				"templateId": args[0],
+				"file":       args[1],
+				"validation": resp,
+			}
+			if opts.output == "json" {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(result)
+			}
+
+			if err := printTemplateFileValidation(cmd.OutOrStdout(), resp); err != nil {
+				return err
+			}
+			if !resp.Valid {
+				return templateFileValidationError(resp)
+			}
+			return nil
+		},
+	}
+}
+
+func newTemplateSubmitFileCmd(opts *rootOptions) *cobra.Command {
+	var callbackURL string
+
+	cmd := &cobra.Command{
+		Use:   "submit-file <template-id> <xlsx-path>",
+		Short: "Submit one filled official template Excel workbook as a run",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			httpClient, err := newHTTPClient(opts)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), opts.timeout)
+			defer cancel()
+
+			var validateResp validateTemplateFileResponse
+			if err := httpClient.PostMultipartFile(ctx, "/v1/templates/validate", map[string]string{
+				"template_id": strings.TrimSpace(args[0]),
+			}, "file", args[1], &validateResp); err != nil {
+				return err
+			}
+			if !validateResp.Valid {
+				if opts.output == "json" {
+					enc := json.NewEncoder(cmd.OutOrStdout())
+					enc.SetIndent("", "  ")
+					_ = enc.Encode(map[string]any{
+						"templateId": args[0],
+						"file":       args[1],
+						"validation": validateResp,
+					})
+				}
+				return templateFileValidationError(validateResp)
+			}
+
+			fields := map[string]string{
+				"template_id": strings.TrimSpace(args[0]),
+			}
+			if strings.TrimSpace(callbackURL) != "" {
+				fields["callback_url"] = strings.TrimSpace(callbackURL)
+			}
+
+			var submitResp submitTemplateFileResponse
+			if err := httpClient.PostMultipartFile(ctx, "/v1/templates/submit", fields, "file", args[1], &submitResp); err != nil {
+				return err
+			}
+
+			result := map[string]any{
+				"templateId": args[0],
+				"file":       args[1],
+				"runId":      submitResp.RunID,
+				"status":     submitResp.Status,
+				"acceptedAt": int64(submitResp.AcceptedAt),
+			}
+			if opts.output == "json" {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(result)
+			}
+
+			_, err = fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"template_id\t%s\nfile\t%s\nrun_id\t%s\nstatus\t%s\naccepted_at\t%s\n",
+				args[0],
+				args[1],
+				submitResp.RunID,
+				submitResp.Status,
+				formatUnix(int64(submitResp.AcceptedAt)),
+			)
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&callbackURL, "callback-url", "", "Optional callback URL")
+	return cmd
+}
+
+func suggestedDownloadFilename(contentDisposition string) string {
+	if strings.TrimSpace(contentDisposition) == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(contentDisposition)
+	if err != nil {
+		return ""
+	}
+	filename := strings.TrimSpace(params["filename"])
+	if filename == "" {
+		return ""
+	}
+	return filepath.Base(filename)
 }
